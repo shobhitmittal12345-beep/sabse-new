@@ -46,10 +46,8 @@
       font-weight: 700;
       background: linear-gradient(135deg, #22c55e, #16a34a);
       color: #052e16;
-      transition: transform .12s ease, box-shadow .12s ease;
       box-shadow: 0 8px 20px rgba(34,197,94,.35);
     }
-    button:hover { transform: translateY(-1px); box-shadow: 0 10px 26px rgba(34,197,94,.45); }
     .form { margin-top: 16px; }
     .form input {
       width: 100%;
@@ -91,7 +89,6 @@
   <div class="card">
     <h1>Live Lal Kitab Session</h1>
     <p class="tagline">2 Hours • Beginner Friendly • Live on Zoom</p>
-
     <div class="price">₹49</div>
 
     <ul class="features">
@@ -104,9 +101,9 @@
     <button id="showFormBtn">Book Your Seat</button>
 
     <div id="detailsBox" class="form hidden">
-      <input id="name" placeholder="Name" />
-      <input id="email" placeholder="Email" />
-      <input id="mobile" placeholder="Mobile" />
+      <input id="name" type="text" placeholder="Name" />
+      <input id="email" type="email" placeholder="Email" />
+      <input id="mobile" type="tel" placeholder="Mobile" />
       <button id="payBtn">Pay Now</button>
     </div>
 
@@ -119,53 +116,63 @@
   </div>
 
   <script>
-    document.getElementById("showFormBtn").onclick = () => {
+    document.getElementById("showFormBtn").onclick = function () {
       document.getElementById("detailsBox").classList.remove("hidden");
     };
 
-    document.getElementById("payBtn").onclick = async () => {
-      const name = document.getElementById("name").value;
-      const email = document.getElementById("email").value;
-      const mobile = document.getElementById("mobile").value;
+    document.getElementById("payBtn").onclick = function () {
+      var name = document.getElementById("name").value;
+      var email = document.getElementById("email").value;
+      var mobile = document.getElementById("mobile").value;
 
-      const res = await fetch("/.netlify/functions/create-order", { method: "POST" });
-      const order = await res.json();
+      fetch("/.netlify/functions/create-order", { method: "POST" })
+        .then(function (res) { return res.json(); })
+        .then(function (order) {
 
-      var options = {
-        key: order.key,
-        amount: order.amount,
-        currency: "INR",
-        order_id: order.id,
-        name: "Lal Kitab Session",
-        handler: async function (response) {
-          const verifyRes = await fetch("/.netlify/functions/verify-payment", {
-            method: "POST",
-            body: JSON.stringify({
-              razorpay_order_id: response.razorpay_order_id,
-              razorpay_payment_id: response.razorpay_payment_id,
-              razorpay_signature: response.razorpay_signature,
-              name, email, mobile
-            })
-          });
+          var options = {
+            key: order.key,
+            amount: order.amount,
+            currency: "INR",
+            order_id: order.id,
+            name: "Lal Kitab Session",
 
-          const result = await verifyRes.json();
+            handler: function (response) {
 
-          if (result.success) {
-            await database.ref("payments").push({
-              name, email, mobile,
-              payment_id: response.razorpay_payment_id,
-              time: new Date().toString()
-            });
+              fetch("/.netlify/functions/verify-payment", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                  razorpay_order_id: response.razorpay_order_id,
+                  razorpay_payment_id: response.razorpay_payment_id,
+                  razorpay_signature: response.razorpay_signature,
+                  name: name,
+                  email: email,
+                  mobile: mobile
+                })
+              })
+              .then(function (res) { return res.json(); })
+              .then(function (result) {
 
-            document.getElementById("detailsBox").classList.add("hidden");
-            document.getElementById("successBox").classList.remove("hidden");
-          } else {
-            alert("Payment verification failed");
-          }
-        }
-      };
+                if (result.success) {
+                  database.ref("payments").push({
+                    name: name,
+                    email: email,
+                    mobile: mobile,
+                    payment_id: response.razorpay_payment_id,
+                    time: new Date().toString()
+                  });
 
-      new Razorpay(options).open();
+                  document.getElementById("detailsBox").classList.add("hidden");
+                  document.getElementById("successBox").classList.remove("hidden");
+                } else {
+                  alert("Payment verification failed");
+                }
+              });
+            }
+          };
+
+          new Razorpay(options).open();
+        });
     };
   </script>
 </body>
