@@ -48,7 +48,7 @@
   </div>
 
   <script>
-    document.getElementById("showFormBtn").onclick = () => {
+    document.getElementById("showFormBtn").onclick = function () {
       document.getElementById("detailsBox").style.display = "block";
       document.getElementById("showFormBtn").style.display = "none";
     };
@@ -56,12 +56,13 @@
     document.getElementById("payForm").addEventListener("submit", async function(e) {
       e.preventDefault();
 
-      const name = name.value;
-      const email = email.value;
-      const mobile = mobile.value;
+      const name = document.getElementById("name").value;
+      const email = document.getElementById("email").value;
+      const mobile = document.getElementById("mobile").value;
 
       const orderRes = await fetch("/.netlify/functions/create-order", {
-        method: "POST"
+        method: "POST",
+        headers: { "Content-Type": "application/json" }
       });
 
       const orderData = await orderRes.json();
@@ -77,11 +78,14 @@
         handler: async function (response) {
           const verifyRes = await fetch("/.netlify/functions/verify-payment", {
             method: "POST",
+            headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
               razorpay_order_id: response.razorpay_order_id,
               razorpay_payment_id: response.razorpay_payment_id,
               razorpay_signature: response.razorpay_signature,
-              name, email, mobile
+              name: name,
+              email: email,
+              mobile: mobile
             })
           });
 
@@ -96,7 +100,8 @@
         }
       };
 
-      new Razorpay(options).open();
+      var rzp = new Razorpay(options);
+      rzp.open();
     });
   </script>
 
