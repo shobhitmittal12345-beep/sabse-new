@@ -4,7 +4,6 @@
   <title>Lal Kitab Live Session</title>
 
   <script src="https://checkout.razorpay.com/v1/checkout.js"></script>
-
   <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
   <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-database.js"></script>
 
@@ -18,7 +17,6 @@
       messagingSenderId: "429980316495",
       appId: "1:429980316495:web:fcb81e86cbd6b1127f8b3a"
     };
-
     firebase.initializeApp(firebaseConfig);
     var database = firebase.database();
   </script>
@@ -26,83 +24,75 @@
 
 <body style="font-family: Arial; text-align:center; background:#f4f4f4; padding:30px;">
 
-  <h1>Live Vedic Science Session – Lal Kitab</h1>
-  <p>2 hours live session for beginners</p>
-  <h2>Price: ₹49 only</h2>
+  <h1>Lal Kitab Live Session</h1>
+  <h2>₹49 only</h2>
 
-  <button id="showFormBtn" style="padding:12px 22px; font-size:18px;">Buy Now</button>
+  <button id="showFormBtn">Buy Now</button>
 
   <div id="detailsBox" style="display:none;">
-    <h3>Enter your details</h3>
-    <form id="payForm">
-      <input type="text" id="name" placeholder="Your Name" required><br><br>
-      <input type="email" id="email" placeholder="Your Email" required><br><br>
-      <input type="tel" id="mobile" placeholder="Your Mobile Number" pattern="[0-9]{10}" required><br><br>
-      <button type="submit">Proceed to Payment</button>
-    </form>
+    <input id="name" placeholder="Name"><br><br>
+    <input id="email" placeholder="Email"><br><br>
+    <input id="mobile" placeholder="Mobile"><br><br>
+    <button id="payBtn">Pay Now</button>
   </div>
 
-  <div id="successBox" style="display:none; background:#d4edda; padding:20px; border-radius:8px; margin-top:20px;">
-    <h2>✅ Payment Successful!</h2>
-    <p>We will contact you shortly.</p>
+  <div id="successBox" style="display:none; background:#c8f7c5; padding:20px;">
+    <h2>Payment Successful ✅</h2>
+    <p>We will contact you soon</p>
   </div>
 
   <script>
-    document.getElementById("showFormBtn").onclick = function () {
+    document.getElementById("showFormBtn").onclick = () => {
       document.getElementById("detailsBox").style.display = "block";
-      document.getElementById("showFormBtn").style.display = "none";
     };
 
-    document.getElementById("payForm").addEventListener("submit", async function(e) {
-      e.preventDefault();
-
+    document.getElementById("payBtn").onclick = async () => {
       const name = document.getElementById("name").value;
       const email = document.getElementById("email").value;
       const mobile = document.getElementById("mobile").value;
 
-      const orderRes = await fetch("/.netlify/functions/create-order", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" }
-      });
-
-      const orderData = await orderRes.json();
+      const res = await fetch("/.netlify/functions/create-order", { method: "POST" });
+      const order = await res.json();
 
       var options = {
-        key: orderData.key,
-        amount: orderData.amount,
+        key: order.key,
+        amount: order.amount,
         currency: "INR",
-        order_id: orderData.id,
-        name: "Lal Kitab Live Session",
-        description: "2 hour live class",
-
+        order_id: order.id,
+        name: "Lal Kitab Session",
         handler: async function (response) {
+
           const verifyRes = await fetch("/.netlify/functions/verify-payment", {
             method: "POST",
-            headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
               razorpay_order_id: response.razorpay_order_id,
               razorpay_payment_id: response.razorpay_payment_id,
               razorpay_signature: response.razorpay_signature,
-              name: name,
-              email: email,
-              mobile: mobile
+              name, email, mobile
             })
           });
 
           const result = await verifyRes.json();
 
           if (result.success) {
+            await database.ref("payments").push({
+              name,
+              email,
+              mobile,
+              payment_id: response.razorpay_payment_id,
+              time: new Date().toString()
+            });
+
             document.getElementById("detailsBox").style.display = "none";
             document.getElementById("successBox").style.display = "block";
           } else {
-            alert("Payment verification failed.");
+            alert("Payment verification failed");
           }
         }
       };
 
-      var rzp = new Razorpay(options);
-      rzp.open();
-    });
+      new Razorpay(options).open();
+    };
   </script>
 
 </body>
