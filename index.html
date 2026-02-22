@@ -8,6 +8,7 @@
   <script src="https://checkout.razorpay.com/v1/checkout.js"></script>
   <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
   <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-database.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-auth.js"></script> <!-- Added for OTP -->
 
   <style>
     body {
@@ -71,6 +72,7 @@
   </style>
 
   <script>
+    // Firebase initialization
     var firebaseConfig = {
       apiKey: "AIzaSyA5pWE5v7GJZuHtZsIHpuwCUWWCFI_Tt5k",
       authDomain: "vedic-lal-kitab.firebaseapp.com",
@@ -104,7 +106,18 @@
       <input id="name" type="text" placeholder="Name" />
       <input id="email" type="email" placeholder="Email" />
       <input id="mobile" type="tel" placeholder="Mobile" />
-      <button id="payBtn">Pay Now</button>
+
+      <!-- OTP fields -->
+      <div id="otpSection" class="hidden">
+        <input id="otp" type="text" placeholder="Enter OTP" />
+        <button id="verifyOtpBtn">Verify OTP</button>
+      </div>
+
+      <button id="sendOtpBtn">Send OTP</button>
+      <button id="payBtn" class="hidden">Pay Now</button>
+
+      <!-- reCAPTCHA container required by Firebase -->
+      <div id="recaptcha-container"></div>
     </div>
 
     <div id="successBox" class="success hidden">
@@ -120,24 +133,62 @@
       document.getElementById("detailsBox").classList.remove("hidden");
     };
 
+    // Initialize reCAPTCHA
+    window.recaptchaVerifier = new firebase.auth.RecaptchaVerifier('recaptcha-container', {
+      'size': 'invisible'
+    });
+
+    // Send OTP
+    document.getElementById("sendOtpBtn").onclick = function() {
+      const mobile = document.getElementById("mobile").value;
+      if(!mobile) { alert("Enter mobile number"); return; }
+
+      firebase.auth().signInWithPhoneNumber(mobile, window.recaptchaVerifier)
+        .then(function(confirmationResult) {
+          window.confirmationResult = confirmationResult;
+          alert("OTP sent to " + mobile);
+          document.getElementById("otpSection").classList.remove("hidden");
+        })
+        .catch(function(error) {
+          console.error(error);
+          alert("Error sending OTP: " + error.message);
+        });
+    };
+
+    // Verify OTP
+    document.getElementById("verifyOtpBtn").onclick = function() {
+      const code = document.getElementById("otp").value;
+      if(!code) { alert("Enter OTP"); return; }
+
+      window.confirmationResult.confirm(code)
+        .then(function(result) {
+          alert("Phone verified successfully!");
+          document.getElementById("sendOtpBtn").classList.add("hidden");
+          document.getElementById("otpSection").classList.add("hidden");
+          document.getElementById("payBtn").classList.remove("hidden"); // show payment button
+        })
+        .catch(function(error) {
+          console.error(error);
+          alert("Invalid OTP: " + error.message);
+        });
+    };
+
+    // Razorpay payment
     document.getElementById("payBtn").onclick = function () {
       var name = document.getElementById("name").value;
       var email = document.getElementById("email").value;
       var mobile = document.getElementById("mobile").value;
 
       fetch("/.netlify/functions/create-order", { method: "POST" })
-        .then(function (res) { return res.json(); })
-        .then(function (order) {
-
+        .then(res => res.json())
+        .then(order => {
           var options = {
             key: order.key,
             amount: order.amount,
             currency: "INR",
             order_id: order.id,
             name: "Lal Kitab Session",
-
             handler: function (response) {
-
               fetch("/.netlify/functions/verify-payment", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
@@ -150,9 +201,8 @@
                   mobile: mobile
                 })
               })
-              .then(function (res) { return res.json(); })
-              .then(function (result) {
-
+              .then(res => res.json())
+              .then(result => {
                 if (result.success) {
                   database.ref("payments").push({
                     name: name,
@@ -161,7 +211,6 @@
                     payment_id: response.razorpay_payment_id,
                     time: new Date().toString()
                   });
-
                   document.getElementById("detailsBox").classList.add("hidden");
                   document.getElementById("successBox").classList.remove("hidden");
                 } else {
@@ -170,7 +219,6 @@
               });
             }
           };
-
           new Razorpay(options).open();
         });
     };
